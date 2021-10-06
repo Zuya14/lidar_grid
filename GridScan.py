@@ -3,7 +3,7 @@ from collections import deque
 
 import numpy as np
 
-EXTEND_AREA = 0.1
+EXTEND_AREA = 0.0
 
 class GridScan:
 
@@ -91,7 +91,19 @@ class GridScan:
             for laser_beam in laser_beams:
                 occupancy_map[laser_beam[0]][laser_beam[1]] = 0.0  # free area 0.0
 
-        for ix, iy in zip(ixs, iys):
-            occupancy_map[ix][iy] = 1.0  # occupied area 1.0
+        # for ix, iy in zip(ixs, iys):
+        #     occupancy_map[ix][iy] = 1.0  # occupied area 1.0
+
+        return occupancy_map
+        
+    def generate_ray_casting_grid_map_roll(self, ox, oy, x, y):
+
+        occupancy_map = self.generate_ray_casting_grid_map(ox, oy)
+
+        ix = round(x / self.resolution)
+        iy = round(y / self.resolution)
+
+        occupancy_map = np.roll(occupancy_map, ix, axis=1)
+        occupancy_map = np.roll(occupancy_map, iy, axis=0)
 
         return occupancy_map
