@@ -59,6 +59,54 @@ class GridScan:
         points = np.array(points)
         return points
 
+    def generate_maps(self, ox, oy):
+        
+        space_map = np.ones((self.grid_num, self.grid_num)) 
+        obstacle_map = np.zeros((self.grid_num, self.grid_num)) 
+
+        center_x = int(round(-self.min_w / self.resolution)) 
+        center_y = center_x 
+
+        ixs = [int(round((x - self.min_w) / self.resolution)) for x in ox]
+        iys = [int(round((y - self.min_w) / self.resolution)) for y in oy]
+
+        for ix, iy in zip(ixs, iys):
+            laser_beams = self.bresenham((center_x, center_y), (ix, iy))  # line form the lidar to the occupied point
+
+            for laser_beam in laser_beams:
+                space_map[laser_beam[0]][laser_beam[1]] = 0.0  
+
+            obstacle_map[ix][iy] = 1.0  
+
+        return space_map, obstacle_map
+
+    def merge_maps(self, space_map, obstacle_map):
+        return np.maximum(space_map * 0.5, obstacle_map)
+
+    def generate_local_map(self, ox, oy):
+        return self.merge_maps(*self.generate_maps(ox, oy))
+
+    def roll_map(self, local_map, x, y):
+        ix = round(x / self.resolution)
+        iy = round(y / self.resolution)
+
+        g_map = np.roll(local_map, ix, axis=1)
+        g_map = np.roll(g_map, iy, axis=0)
+
+        return g_map
+
+    def generate_map(self, ox, oy, x, y):
+
+        occupancy_map = self.generate_local_map(ox, oy)
+
+        ix = round(x / self.resolution)
+        iy = round(y / self.resolution)
+
+        occupancy_map = np.roll(occupancy_map, ix, axis=1)
+        occupancy_map = np.roll(occupancy_map, iy, axis=0)
+
+        return occupancy_map
+
     def generate_ray_casting_grid_map(self, ox, oy):
         
         # default 0.5

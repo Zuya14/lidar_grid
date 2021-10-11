@@ -18,9 +18,9 @@ x, y = 0, 0
 occupancy_map = None
 
 while True:
-    action = env.sample_random_action()
-
-    state, _, done, _ = env.step(action)
+    # action = env.sample_random_action()
+    state = env.reset()
+    # state, _, done, _ = env.step(action)
     x, y = state[0], state[1]
 
     scan = GridScan(lidar_maxLen=10.0, resolution=0.1)
@@ -31,18 +31,33 @@ while True:
     # occupancy_map = scan.generate_ray_casting_grid_map(ox, oy)
 
     if occupancy_map is None:
-        occupancy_map = scan.generate_ray_casting_grid_map_roll(ox, oy, x-4.5, y-4.5)
+        # occupancy_map = scan.generate_ray_casting_grid_map_roll(ox, oy, x-4.5, y-4.5)
+        # occupancy_map = scan.generate_map(ox, oy, x-4.5, y-4.5)
+        space_map, obstacle_map = scan.generate_maps(ox, oy)
+        space_map = scan.roll_map(space_map, x-4.5, y-4.5)
+        obstacle_map = scan.roll_map(obstacle_map, x-4.5, y-4.5)
     else: 
         # occupancy_map = scan.generate_ray_casting_grid_map_roll(ox, oy, x-4.5, y-4.5)
         # occupancy_map = np.maximum(scan.generate_ray_casting_grid_map_roll(ox, oy, x-4.5, y-4.5), occupancy_map)
-        occupancy_map = np.minimum(scan.generate_ray_casting_grid_map_roll(ox, oy, x-4.5, y-4.5), occupancy_map)
+        # occupancy_map = np.minimum(scan.generate_ray_casting_grid_map_roll(ox, oy, x-4.5, y-4.5), occupancy_map)
+        # occupancy_map = np.minimum(scan.generate_map(ox, oy, x-4.5, y-4.5), occupancy_map)
+        # occupancy_map = scan.generate_map(ox, oy, x-4.5, y-4.5)
+        _space_map, _obstacle_map = scan.generate_maps(ox, oy)
+        _space_map = scan.roll_map(_space_map, x-4.5, y-4.5)
+        _obstacle_map = scan.roll_map(_obstacle_map, x-4.5, y-4.5)
 
+        space_map = np.minimum(_space_map, space_map)
+        obstacle_map = np.maximum(_obstacle_map, obstacle_map)
 
+    occupancy_map = scan.merge_maps(space_map, obstacle_map)
+
+    plt.clf()
     plt.imshow(occupancy_map, origin='lower', cmap="PiYG_r")
+    plt.plot(int(round((x-4.5 - scan.min_w) / scan.resolution)), int(round((y-4.5 - scan.min_w) / scan.resolution)), "ob")
     plt.pause(0.1)
 
-    if done:
-        break
+    # if done:
+    #     break
 
 
 
