@@ -17,7 +17,8 @@ plt.figure()
 x, y = 0, 0
 occupancy_map = None
 
-while True:
+# while True:
+for _ in range(100):
     # action = env.sample_random_action()
     state = env.reset()
     # state, _, done, _ = env.step(action)
@@ -59,6 +60,7 @@ while True:
     # if done:
     #     break
 
+np.save('gridmap_maze3', occupancy_map)
 
 
 # occupancy_map, min_x, max_x, min_y, max_y, xy_resolution = \
