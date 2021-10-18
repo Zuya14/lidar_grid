@@ -1,97 +1,140 @@
 from square3Env import square3Env
 from maze3Env import maze3Env
 import math
-# env = square3Env()
-env = maze3Env()
-env.setting()
-
-# x, y = env.observe_all()[0][:2]
-# print(x,y)
-
 from lidar_to_grid_map import generate_ray_casting_grid_map
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.patches as patches
 from GridScan import GridScan
+from NoveltyBuffer import NoveltyBuffer
 
-plt.figure()
-x, y = 0, 0
-occupancy_map = None
+def saveMapCsv():
+    # env = square3Env()
+    env = maze3Env()
+    env.setting()
 
-# while True:
-for _ in range(100):
-    # action = env.sample_random_action()
-    state = env.reset()
-    # state, _, done, _ = env.step(action)
-    x, y = state[0], state[1]
+    plt.figure()
+    x, y = 0, 0
+    occupancy_map = None
 
-    scan = GridScan(lidar_maxLen=10.0, resolution=0.1)
+    for _ in range(100):
+        state = env.reset()
+        x, y = state[0], state[1]
 
-    rads, dist = env.scan()
-    ox = np.sin(rads) * dist
-    oy = np.cos(rads) * dist
-    # occupancy_map = scan.generate_ray_casting_grid_map(ox, oy)
+        scan = GridScan(lidar_maxLen=10.0, resolution=0.1)
 
-    if occupancy_map is None:
-        # occupancy_map = scan.generate_ray_casting_grid_map_roll(ox, oy, x-4.5, y-4.5)
-        # occupancy_map = scan.generate_map(ox, oy, x-4.5, y-4.5)
-        space_map, obstacle_map = scan.generate_maps(ox, oy)
-        space_map = scan.roll_map(space_map, x-4.5, y-4.5)
-        obstacle_map = scan.roll_map(obstacle_map, x-4.5, y-4.5)
-    else: 
-        # occupancy_map = scan.generate_ray_casting_grid_map_roll(ox, oy, x-4.5, y-4.5)
-        # occupancy_map = np.maximum(scan.generate_ray_casting_grid_map_roll(ox, oy, x-4.5, y-4.5), occupancy_map)
-        # occupancy_map = np.minimum(scan.generate_ray_casting_grid_map_roll(ox, oy, x-4.5, y-4.5), occupancy_map)
-        # occupancy_map = np.minimum(scan.generate_map(ox, oy, x-4.5, y-4.5), occupancy_map)
-        # occupancy_map = scan.generate_map(ox, oy, x-4.5, y-4.5)
-        _space_map, _obstacle_map = scan.generate_maps(ox, oy)
-        _space_map = scan.roll_map(_space_map, x-4.5, y-4.5)
-        _obstacle_map = scan.roll_map(_obstacle_map, x-4.5, y-4.5)
+        rads, dist = env.scan()
+        ox = np.sin(rads) * dist
+        oy = np.cos(rads) * dist
 
-        space_map = np.minimum(_space_map, space_map)
-        obstacle_map = np.maximum(_obstacle_map, obstacle_map)
+        if occupancy_map is None:
+            space_map, obstacle_map = scan.generate_maps(ox, oy)
+            space_map = scan.roll_map(space_map, x-4.5, y-4.5)
+            obstacle_map = scan.roll_map(obstacle_map, x-4.5, y-4.5)
+        else: 
+            _space_map, _obstacle_map = scan.generate_maps(ox, oy)
+            _space_map = scan.roll_map(_space_map, x-4.5, y-4.5)
+            _obstacle_map = scan.roll_map(_obstacle_map, x-4.5, y-4.5)
 
-    occupancy_map = scan.merge_maps(space_map, obstacle_map)
+            space_map = np.minimum(_space_map, space_map)
+            obstacle_map = np.maximum(_obstacle_map, obstacle_map)
 
-    plt.clf()
+        occupancy_map = scan.merge_maps(space_map, obstacle_map)
+
+        plt.clf()
+        plt.imshow(occupancy_map, origin='lower', cmap="PiYG_r")
+        plt.plot(int(round((x-4.5 - scan.min_w) / scan.resolution)), int(round((y-4.5 - scan.min_w) / scan.resolution)), "ob")
+        plt.pause(0.1)
+
+    np.save('gridmap_maze3', occupancy_map)
+
+def loadMapCsv():
+    file_name = 'gridmap_maze3.npy'
+    occupancy_map = np.load(file_name)
     plt.imshow(occupancy_map, origin='lower', cmap="PiYG_r")
-    plt.plot(int(round((x-4.5 - scan.min_w) / scan.resolution)), int(round((y-4.5 - scan.min_w) / scan.resolution)), "ob")
-    plt.pause(0.1)
 
-    # if done:
-    #     break
+    plt.show()
 
-np.save('gridmap_maze3', occupancy_map)
+def calcCompleteMap():
+    file_name = 'gridmap_maze3.npy'
+    world_map = np.load(file_name)
+    
+    buffer_size=10
+    thr_distance=1.0
+    noveltyBuffer = NoveltyBuffer(buffer_size, thr_distance)
+
+    # print(np.count_nonzero(world_map == 0))
+    # print(np.count_nonzero(world_map == 1))
+    # print(np.count_nonzero(world_map == 0.5))
+
+    env = maze3Env()
+    env.setting()
+
+    # fig = plt.figure()
+    # ax = plt.axes()
+    fig, ax = plt.subplots()
+    x, y = 0, 0
+    occupancy_map = None
+
+    completeRate = 0
+
+    done = False
+
+    while completeRate < 0.99 and not done:
+        # state = env.reset()
+        action = env.sample_random_action()
+        action[0] = 1.0 
+        state, reward, done, _ = env.step(action)
+        # state, reward, done, _ = env.step([1,1,0])
+        x, y = state[0], state[1]
+
+        scan = GridScan(lidar_maxLen=10.0, resolution=0.1)
+
+        rads, dist = env.scan()
+        ox = np.sin(rads) * dist
+        oy = np.cos(rads) * dist
+
+        if occupancy_map is None:
+            space_map, obstacle_map = scan.generate_maps(ox, oy)
+            space_map = scan.roll_map(space_map, x-4.5, y-4.5)
+            obstacle_map = scan.roll_map(obstacle_map, x-4.5, y-4.5)
+        else: 
+            _space_map, _obstacle_map = scan.generate_maps(ox, oy)
+            _space_map = scan.roll_map(_space_map, x-4.5, y-4.5)
+            _obstacle_map = scan.roll_map(_obstacle_map, x-4.5, y-4.5)
+
+            space_map = np.minimum(_space_map, space_map)
+            obstacle_map = np.maximum(_obstacle_map, obstacle_map)
+
+        occupancy_map = scan.merge_maps(space_map, obstacle_map)
+
+        # plt.clf()
+        ax.clear()
+
+        # ax.images.clear()
+        plt.imshow(occupancy_map, origin='lower', cmap="PiYG_r")
+        
+        # ax.collections.clear()
+        plt.plot(int(round((x-4.5 - scan.min_w) / scan.resolution)), int(round((y-4.5 - scan.min_w) / scan.resolution)), "ob")
 
 
-# occupancy_map, min_x, max_x, min_y, max_y, xy_resolution = \
-#     generate_ray_casting_grid_map(ox, oy, xy_resolution, True)
+        noveltyBuffer.add_if_far(state[:2])
 
-# print(occupancy_map, min_x, max_x, min_y, max_y, xy_resolution)
+        # ax.patches.clear()
+        for p in noveltyBuffer.buffer:
+            draw_circle = patches.Circle(xy=(int(round((p[0]-4.5 - scan.min_w) / scan.resolution)), int(round((p[1]-4.5 - scan.min_w) / scan.resolution))), radius=thr_distance/scan.resolution, color='r', fill=False)
+            ax.add_patch(draw_circle)
 
-# # xy_res = np.array(occupancy_map).shape
-# plt.figure(1, figsize=(10, 4))
-# plt.figure()
+        occupancy_map_space_num = np.count_nonzero((occupancy_map[occupancy_map == world_map]) == 0)
+        world_map_space_num = np.count_nonzero(world_map == 0)
+        completeRate = occupancy_map_space_num / world_map_space_num
+        # print(f'{completeRate}:{occupancy_map_space_num}/{world_map_space_num}')
+        print(f'{completeRate}:{occupancy_map_space_num}/{world_map_space_num} -> {noveltyBuffer.calc_mean_distance(state[:2])}')
 
-# plt.subplot(122)
-# plt.imshow(occupancy_map, cmap="PiYG_r")
-# # cmap = "binary" "PiYG_r" "PiYG_r" "bone" "bone_r" "RdYlGn_r"
-# # # plt.clim(-0.4, 1.4)
-# # # plt.gca().set_xticks(np.arange(-.5, xy_res[1], 1), minor=True)
-# # # plt.gca().set_xticks(np.arange(-.5, xy_res[1], 1), minor=False)
-# # # plt.gca().set_yticks(np.arange(-.5, xy_res[0], 1), minor=True)
-# # # plt.gca().set_yticks(np.arange(-.5, xy_res[0], 1), minor=False)
-# # # plt.grid(True, which="minor", color="w", linewidth=0.6, alpha=0.5)
-# # # plt.grid(True, color="w", linewidth=0.6, alpha=0.5)
-# # plt.colorbar()
+        plt.pause(0.1)
+        # plt.show()
 
-# # plt.subplot(121)
-# # plt.plot([ox+x, np.full(np.size(oy), x)], [oy+y, np.full(np.size(oy), y)], "ro-")
-# # plt.axis("equal")
-# # plt.plot(x, y, "ob")
-# # # plt.gca().set_aspect("equal", "box")
-# # # bottom, top = plt.ylim()  # return the current y-lim
-# # # plt.ylim((top, bottom))  # rescale y axis, to match the grid orientation
-# # # plt.ylim((bottom, top))  # rescale y axis, to match the grid orientation
-# # plt.grid(True)
-
-# plt.show()
+if __name__ == '__main__':
+    # saveMapCsv() 
+    # loadMapCsv()
+    calcCompleteMap()
