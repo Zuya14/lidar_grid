@@ -74,9 +74,11 @@ class GridScan:
             laser_beams = self.bresenham((center_x, center_y), (ix, iy))  # line form the lidar to the occupied point
 
             for laser_beam in laser_beams:
-                space_map[laser_beam[0]][laser_beam[1]] = 0.0  
+                if 0<=laser_beam[0] and laser_beam[0]<self.grid_num and 0<=laser_beam[1] and laser_beam[1]<self.grid_num:
+                    space_map[laser_beam[0]][laser_beam[1]] = 0.0  
 
-            obstacle_map[ix][iy] = 1.0  
+            if 0<=ix and ix<self.grid_num and 0<=iy and iy<self.grid_num:
+                obstacle_map[ix][iy] = 1.0  
 
         return space_map, obstacle_map
 

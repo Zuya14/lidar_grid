@@ -10,6 +10,7 @@ import math
 import lidar_util
 
 robot_name = "urdf/pla-robot.urdf"
+goal_name = "urdf/goal.urdf"
 
 class sim_abs(ABC):
 
@@ -19,6 +20,7 @@ class sim_abs(ABC):
         self.phisicsClient = bc.BulletClient(connection_mode=mode)
         self.reset(sec=sec)
 
+        self.setImageSize()
         self.scanHeight = 0.55
 
     @abstractmethod
@@ -52,7 +54,8 @@ class sim_abs(ABC):
         self.w = w
 
         self.phisicsClient.resetSimulation()
-        self.robotUniqueId = 0 
+        self.robotUniqueId = None 
+        self.goalUniqueId = None 
         self.bodyUniqueIds = []
         self.phisicsClient.setTimeStep(sec)
 
@@ -60,10 +63,12 @@ class sim_abs(ABC):
         
         self.done = False
 
+        self.loadObstacle()
+
         self.tgt_pos = self.calcTgtPos(tgtPos)
 
         x, y, theta = self.calcInitPos(initPos)
-        self.loadBodys(x, y, theta)
+        # self.loadBodys(x, y, theta)
 
         self.old_state = self.getState()
 
@@ -74,17 +79,47 @@ class sim_abs(ABC):
     def getId(self):
         return self._id
 
-    def loadBodys(self, x, y, theta):
+    def loadRobot(self, x, y, theta):
         self.robotPos = (x,y,0)
         self.robotOri = p.getQuaternionFromEuler([0, 0, theta])
+        
+        if self.robotUniqueId is not None:
+            self.phisicsClient.removeBody(self.robotUniqueId)
 
         self.robotUniqueId = self.phisicsClient.loadURDF(
             robot_name,
             basePosition=self.robotPos,
             baseOrientation = self.robotOri
             )
+        self.phisicsClient.stepSimulation()
 
-        self.loadObstacle()
+    def loadGoal(self, x, y, theta):
+        goalPos = (x,y,0)
+        goalOri = p.getQuaternionFromEuler([0, 0, theta])
+
+        if self.goalUniqueId is not None:
+            self.phisicsClient.removeBody(self.goalUniqueId)
+
+        self.goalUniqueId = self.phisicsClient.loadURDF(
+            goal_name,
+            basePosition=goalPos,
+            baseOrientation = goalOri
+            )
+        self.phisicsClient.stepSimulation()
+
+    def loadBodys(self, x, y, theta):
+        # self.robotPos = (x,y,0)
+        # self.robotOri = p.getQuaternionFromEuler([0, 0, theta])
+
+        # self.robotUniqueId = self.phisicsClient.loadURDF(
+        #     robot_name,
+        #     basePosition=self.robotPos,
+        #     baseOrientation = self.robotOri
+        #     )
+
+        # self.loadRobot(x, y, theta)
+        pass
+
     
     @abstractmethod
     def loadObstacle(self):
@@ -135,6 +170,13 @@ class sim_abs(ABC):
 
         return self.scanDist
 
+    def getObserveLocalVec(self, bullet_lidar):
+        pos, ori = self.getRobotPosInfo()
+        yaw = p.getEulerFromQuaternion(ori)[2]
+        posLocal = bullet_lidar.scanPosLocal(self.phisicsClient, pos, yaw, height=self.scanHeight)[:, :2]
+
+        return posLocal
+
     def getState(self):
         pos, ori = self.getRobotPosInfo()
         return np.array([pos[0], pos[1], p.getEulerFromQuaternion(ori)[2]])
@@ -175,12 +217,18 @@ class sim_abs(ABC):
 
     def contacts(self):
         contactList = []
-        for i in self.bodyUniqueIds[0:]: # 接触判定
+        for i in self.bodyUniqueIds: # 接触判定
             contactList += self.phisicsClient.getContactPoints(self.robotUniqueId, i)
         return contactList 
 
     def isContacts(self):
         return len(self.contacts()) > 0
+
+    def goal_isContacts(self):
+        contactList = []
+        for i in self.bodyUniqueIds: # 接触判定
+            contactList += self.phisicsClient.getContactPoints(self.goalUniqueId, i)
+        return len(contactList) > 0
 
     @abstractmethod
     def isArrive(self):
@@ -217,12 +265,21 @@ class sim_abs(ABC):
         cv2.circle(img, tuple(pts[0]), radius=20, color=(255,0,0), thickness=-1, lineType=cv2.LINE_8, shift=0)
         cv2.circle(img, tuple(pts[1]), radius=20, color=(0,0,255), thickness=2, lineType=cv2.LINE_8, shift=0)
 
+        
+        yaw = self.getState()[2]
+        dp = np.array([np.cos(yaw), -yaw*np.sin(yaw)]) * (k/maxLen)
+        dp = dp.astype(np.int)
+
+        cv2.line(img, tuple(pts[0]), tuple(pts[0]+dp), color=(0,0,128), thickness=1, lineType=cv2.LINE_8, shift=0)
+
         return img
 
     def renderLidar(self, img, center, maxLen, lidar):
+        yaw = self.getState()[2]
+        
         rads = np.arange(lidar.startDeg, lidar.endDeg, lidar.resolusion)*(math.pi/180.0)
-        cos = np.cos(rads)
-        sin = np.sin(rads)
+        cos = np.cos(rads+yaw)
+        sin = np.sin(rads+yaw)
 
         pos, ori = self.getRobotPosInfo()
         yaw = p.getEulerFromQuaternion(ori)[2]
@@ -254,7 +311,8 @@ class sim_abs(ABC):
         pos = tuple(pos.astype(np.int))
 
         for pt in pts:
-            cv2.line(img, pos, tuple(pt), color=(255,0,0), thickness=1, lineType=cv2.LINE_8, shift=0)
+            # cv2.line(img, pos, tuple(pt), color=(255,0,0), thickness=1, lineType=cv2.LINE_8, shift=0)
+            cv2.line(img, pos, tuple(pt), color=(0,128,0), thickness=1, lineType=cv2.LINE_8, shift=0)
 
         return img
 
@@ -262,8 +320,8 @@ class sim_abs(ABC):
         img, center = self.createImage()
         maxLen = np.max(self.getWallPoints())/2 + self.getRenderMargin()
 
-        img = self.renderLidar(img, center, maxLen, lidar)
         img = self.renderWall(img, center, maxLen)
+        img = self.renderLidar(img, center, maxLen, lidar)
         img = self.renderRobotAndGoal(img, center, maxLen)
 
         return img

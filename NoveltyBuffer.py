@@ -32,3 +32,29 @@ class NoveltyBuffer:
             mean_distance = mean_distance / length
 
         return mean_distance
+
+    def calc_limited_mean_distance(self, pos):
+        length = len(self.buffer)
+        mean_distance = 0
+
+        if length > 0:
+            for p in self.buffer:  
+                d = math.sqrt((p[0] - pos[0])**2 + (p[1] - pos[1])**2)
+
+                if d > self.thr_distance:
+                    mean_distance += d
+                # else:
+                #     mean_distance = 0
+
+            mean_distance = mean_distance / length
+
+        return mean_distance
+
+if __name__ == '__main__':
+    bf = NoveltyBuffer(5, 1)
+
+    import numpy as np
+
+    for _ in range(10):
+        bf.add_if_far(np.random.randint(0, 100, (2)))
+        print(bf.buffer[-1], bf.buffer)

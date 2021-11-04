@@ -204,7 +204,8 @@ class maze3Env(gym.Env):
         # resolusion = 22.5
         # resolusion = 12
         # resolusion = 36
-        resolusion = 6
+        # resolusion = 6
+        resolusion = 4
         # resolusion = 1
         deg_offset = 90.
         rad_offset = deg_offset*(math.pi/180.0)

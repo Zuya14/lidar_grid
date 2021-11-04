@@ -7,6 +7,10 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 from GridScan import GridScan
 from NoveltyBuffer import NoveltyBuffer
+from CuriosityEnv1 import CuriosityEnv1
+from CuriosityEnv2 import CuriosityEnv2
+from CuriosityEnv3 import CuriosityEnv3
+from CuriosityEnv4 import CuriosityEnv4
 
 def saveMapCsv():
     # env = square3Env()
@@ -77,6 +81,7 @@ def calcCompleteMap():
     occupancy_map = None
 
     completeRate = 0
+    old_occupancy_map_space_num = 0
 
     done = False
 
@@ -129,12 +134,84 @@ def calcCompleteMap():
         world_map_space_num = np.count_nonzero(world_map == 0)
         completeRate = occupancy_map_space_num / world_map_space_num
         # print(f'{completeRate}:{occupancy_map_space_num}/{world_map_space_num}')
-        print(f'{completeRate}:{occupancy_map_space_num}/{world_map_space_num} -> {noveltyBuffer.calc_mean_distance(state[:2])}')
+        # print(f'{completeRate}:{occupancy_map_space_num}/{world_map_space_num} -> {noveltyBuffer.calc_mean_distance(state[:2])}')
+        print(f'{completeRate}:increase {(occupancy_map_space_num - old_occupancy_map_space_num)*(scan.resolution*scan.resolution)}')
+        old_occupancy_map_space_num = occupancy_map_space_num
 
         plt.pause(0.1)
         # plt.show()
 
+def local_map():
+
+    # env = maze3Env()
+    # env = CuriosityEnv1()
+    # env = CuriosityEnv2()
+    # env = CuriosityEnv3()
+    env = CuriosityEnv4()
+    env.setting()
+
+    # fig = plt.figure()
+    # ax = plt.axes()
+    fig, ax = plt.subplots()
+    x, y = 0, 0
+    occupancy_map = None
+
+    completeRate = 0
+    old_occupancy_map_space_num = 0
+
+    done = False
+
+    # scan = GridScan(lidar_maxLen=10.0, resolution=0.1)
+    # scan = GridScan(lidar_maxLen=10.0, resolution=0.15625)
+    # scan = GridScan(lidar_maxLen=10.0, resolution=0.3125)
+    scan = GridScan(lidar_maxLen=10.0, resolution=0.01953125)
+    # scan = GridScan(lidar_maxLen=10.0, resolution=0.009765625)
+    
+    print(scan.grid_num)
+
+    for _ in range(5):
+
+        while not done:
+            # state = env.reset()
+            action = env.sample_random_action()
+            # action[0] = 1.0 
+            state, reward, done, _ = env.step(action)
+            # state, reward, done, _ = env.step([1,1,0])
+            x, y = state[0], state[1]
+
+            rads, dist = env.scan()
+            ox = np.sin(rads) * dist
+            oy = np.cos(rads) * dist
+
+            if occupancy_map is None:
+                space_map, obstacle_map = scan.generate_maps(ox, oy)
+                _space_map, _obstacle_map = space_map, obstacle_map
+                # space_map = scan.roll_map(space_map, x-4.5, y-4.5)
+                # obstacle_map = scan.roll_map(obstacle_map, x-4.5, y-4.5)
+            else: 
+                _space_map, _obstacle_map = scan.generate_maps(ox, oy)
+                # _space_map = scan.roll_map(_space_map, x-4.5, y-4.5)
+                # _obstacle_map = scan.roll_map(_obstacle_map, x-4.5, y-4.5)
+
+                space_map = np.minimum(_space_map, space_map)
+                obstacle_map = np.maximum(_obstacle_map, obstacle_map)
+
+            occupancy_map = scan.merge_maps(space_map, obstacle_map)
+            _occupancy_map = scan.merge_maps(_space_map, _obstacle_map)
+
+            # plt.clf()
+            ax.clear()
+
+            plt.imshow(_occupancy_map, cmap = "gray")
+
+            plt.pause(0.1)
+            # plt.show()
+
+        env.reset()
+        done = False
+
 if __name__ == '__main__':
     # saveMapCsv() 
     # loadMapCsv()
-    calcCompleteMap()
+    # calcCompleteMap()
+    local_map()

@@ -180,7 +180,8 @@ class square3Env(gym.Env):
     def createLidar(self):
         # resolusion = 90
         # resolusion = 12
-        resolusion = 36
+        # resolusion = 36
+        resolusion = 4
         # resolusion = 1
         deg_offset = 90.
         rad_offset = deg_offset*(math.pi/180.0)

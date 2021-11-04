@@ -14,25 +14,36 @@
             <mass value=".0"/>
             <inertia ixx="0" ixy="0" ixz="0" iyy="0" iyz="0" izz="0"/>
         </inertial>
-        <visual>
-            <!-- <geometry>
-                <mesh filename="obj/pla-robot.obj" scale="1.0 1.0 1.0"/>
-            </geometry> -->
+        <!-- <visual>
             <geometry>
-                <cylinder length="0.5" radius="0.25"/>
+                <mesh filename="obj/pla-robot.obj" scale="1.0 1.0 1.0"/>
             </geometry>
-            <origin rpy="0 0 0" xyz="0 0 0.25"/>
+            <origin rpy="0 0 0" xyz="0 0 -0.25"/>
             <material name="Blue1">
                 <color rgba="0.2 0.2 1 1" />
             </material>
-        </visual>
-        <collision>
-            <origin rpy="0 0 0" xyz="0 0 0.25"/>
+        </visual> -->
+        <!-- <collision>
+            <origin rpy="0 0 0" xyz="0 0 0"/>
             <geometry>
-                <!-- <cylinder length="0.5" radius="0.25"/> -->
-                <cylinder length="0.5" radius="0.18"/>
+                <cylinder length="0.5" radius="0.25"/>
+            </geometry>
+        </collision> -->
+        <collision>
+            <origin rpy="0 0 0" xyz="0 0 0.05"/>
+            <geometry>
+                <cylinder length="0.1" radius="0.25"/>
             </geometry>
         </collision>
+        <!-- <visual>
+            <origin rpy="0 0 0" xyz="0 0 0.05"/>
+            <geometry>
+                <cylinder length="0.1" radius="0.25"/>
+            </geometry>
+            <material name="red">
+                <color rgba="1 0.2 0.2 0.5" />
+            </material>
+        </visual> -->
     </link>
 
     <!-- <link name="cam">
